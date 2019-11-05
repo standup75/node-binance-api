@@ -24,9 +24,6 @@ let api = function Binance() {
     const SocksProxyAgent = require('socks-proxy-agent');
     const stringHash = require('string-hash');
     const async = require('async');
-    const base = 'https://api.binance.com/api/';
-    const wapi = 'https://api.binance.com/wapi/';
-    const sapi = 'https://api.binance.com/sapi/';
     const stream = 'wss://stream.binance.com:9443/ws/';
     const combineStream = 'wss://stream.binance.com:9443/stream?streams=';
     const userAgent = 'Mozilla/4.0 (compatible; Node Binance API)';
@@ -43,6 +40,7 @@ let api = function Binance() {
         reconnect: true,
         verbose: false,
         test: false,
+				baseUrl: 'https://api.binance.com',
         log: function (...args) {
             console.log(Array.prototype.slice.call(args));
         }
@@ -50,6 +48,10 @@ let api = function Binance() {
     Binance.options = default_options;
     Binance.info = { timeOffset: 0 };
     Binance.socketHeartbeatInterval = null;
+		
+		const getBaseUrl = () => `${Binance.options.baseUrl}/api/`;
+		const getWapiUrl = () => `${Binance.options.baseUrl}/wapi/`;
+		const getSapi = () => `${Binance.options.baseUrl}/sapi`;
 
     /**
      * Replaces socks connection uri hostname with IP address
@@ -278,7 +280,7 @@ let api = function Binance() {
             opt.stopPrice = flags.stopPrice;
             if (opt.type === 'LIMIT') throw Error('stopPrice: Must set "type" to one of the following: STOP_LOSS, STOP_LOSS_LIMIT, TAKE_PROFIT, TAKE_PROFIT_LIMIT');
         }
-        signedRequest(base + endpoint, opt, function (error, response) {
+        signedRequest(getBaseUrl() + endpoint, opt, function (error, response) {
             if (!response) {
                 if (callback) callback(error, response);
                 else Binance.options.log('Order() error:', error);
@@ -1113,8 +1115,9 @@ let api = function Binance() {
             if (typeof Binance.options.test === 'undefined') Binance.options.test = default_options.test;
             if (typeof Binance.options.log === 'undefined') Binance.options.log = default_options.log;
             if (typeof Binance.options.verbose === 'undefined') Binance.options.verbose = default_options.verbose;
+            if (typeof Binance.options.baseUrl === 'undefined') Binance.options.baseUrl = default_options.baseUrl;
             if (Binance.options.useServerTime) {
-                apiRequest(base + 'v1/time', {}, function (error, response) {
+                apiRequest(getBaseUrl() + 'v1/time', {}, function (error, response) {
                     Binance.info.timeOffset = response.serverTime - new Date().getTime();
                     //Binance.options.log("server time set: ", response.serverTime, Binance.info.timeOffset);
                     if (callback) callback();
@@ -1206,7 +1209,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         cancel: function (symbol, orderid, callback = false) {
-            signedRequest(base + 'v3/order', { symbol: symbol, orderId: orderid }, function (error, data) {
+            signedRequest(getBaseUrl() + 'v3/order', { symbol: symbol, orderId: orderid }, function (error, data) {
                 if (callback) return callback.call(this, error, data, symbol);
             }, 'DELETE');
         },
@@ -1221,7 +1224,7 @@ let api = function Binance() {
         */
         orderStatus: function (symbol, orderid, callback, flags = {}) {
             let parameters = Object.assign({ symbol: symbol, orderId: orderid }, flags);
-            signedRequest(base + 'v3/order', parameters, function (error, data) {
+            signedRequest(getBaseUrl() + 'v3/order', parameters, function (error, data) {
                 if (callback) return callback.call(this, error, data, symbol);
             });
         },
@@ -1234,7 +1237,7 @@ let api = function Binance() {
         */
         openOrders: function (symbol, callback) {
             let parameters = symbol ? { symbol: symbol } : {};
-            signedRequest(base + 'v3/openOrders', parameters, function (error, data) {
+            signedRequest(getBaseUrl() + 'v3/openOrders', parameters, function (error, data) {
                 return callback.call(this, error, data, symbol);
             });
         },
@@ -1246,14 +1249,14 @@ let api = function Binance() {
         * @return {undefined}
         */
         cancelOrders: function (symbol, callback = false) {
-            signedRequest(base + 'v3/openOrders', { symbol: symbol }, function (error, json) {
+            signedRequest(getBaseUrl() + 'v3/openOrders', { symbol: symbol }, function (error, json) {
                 if (json.length === 0) {
                     if (callback) return callback.call(this, 'No orders present for this symbol', {}, symbol);
                 }
                 for (let obj of json) {
                     let quantity = obj.origQty - obj.executedQty;
                     Binance.options.log('cancel order: ' + obj.side + ' ' + symbol + ' ' + quantity + ' @ ' + obj.price + ' #' + obj.orderId);
-                    signedRequest(base + 'v3/order', { symbol: symbol, orderId: obj.orderId }, function (error, data) {
+                    signedRequest(getBaseUrl() + 'v3/order', { symbol: symbol, orderId: obj.orderId }, function (error, data) {
                         if (callback) return callback.call(this, error, data, symbol);
                     }, 'DELETE');
                 }
@@ -1269,7 +1272,7 @@ let api = function Binance() {
         */
         allOrders: function (symbol, callback, options = {}) {
             let parameters = Object.assign({ symbol: symbol }, options);
-            signedRequest(base + 'v3/allOrders', parameters, function (error, data) {
+            signedRequest(getBaseUrl() + 'v3/allOrders', parameters, function (error, data) {
                 if (callback) return callback.call(this, error, data, symbol);
             });
         },
@@ -1282,7 +1285,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         depth: function (symbol, callback, limit = 100) {
-            publicRequest(base + 'v1/depth', { symbol: symbol, limit: limit }, function (error, data) {
+            publicRequest(getBaseUrl() + 'v1/depth', { symbol: symbol, limit: limit }, function (error, data) {
                 return callback.call(this, error, depthData(data), symbol);
             });
         },
@@ -1295,7 +1298,7 @@ let api = function Binance() {
         */
         avgPrice: function (symbol, callback = false) {
             let opt = {
-                url: base + 'v3/avgPrice?symbol=' + symbol,
+                url: getBaseUrl() + 'v3/avgPrice?symbol=' + symbol,
                 timeout: Binance.options.recvWindow
             };
 
@@ -1321,7 +1324,7 @@ let api = function Binance() {
             if (typeof symbol === 'function') callback = symbol; // backwards compatibility
 
             let opt = {
-                url: base + 'v3/ticker/price' + params,
+                url: getBaseUrl() + 'v3/ticker/price' + params,
                 timeout: Binance.options.recvWindow
             };
 
@@ -1347,7 +1350,7 @@ let api = function Binance() {
             if (typeof symbol === 'function') callback = symbol; // backwards compatibility
 
             let opt = {
-                url: base + 'v3/ticker/bookTicker' + params,
+                url: getBaseUrl() + 'v3/ticker/bookTicker' + params,
                 timeout: Binance.options.recvWindow
             };
 
@@ -1373,7 +1376,7 @@ let api = function Binance() {
         */
         prevDay: function (symbol, callback) {
             let input = symbol ? { symbol: symbol } : {};
-            publicRequest(base + 'v1/ticker/24hr', input, function (error, data) {
+            publicRequest(getBaseUrl() + 'v1/ticker/24hr', input, function (error, data) {
                 if (callback) return callback.call(this, error, data, symbol);
             });
         },
@@ -1384,7 +1387,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         exchangeInfo: function (callback) {
-            publicRequest(base + 'v1/exchangeInfo', {}, callback);
+            publicRequest(getBaseUrl() + 'v1/exchangeInfo', {}, callback);
         },
         /**
         * Gets the dust log for user
@@ -1392,7 +1395,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         dustLog: function (callback) {
-            signedRequest(wapi + '/v3/userAssetDribbletLog.html', {}, callback);
+            signedRequest(getWapiUrl() + '/v3/userAssetDribbletLog.html', {}, callback);
         },
         /**
         * Gets the the system status
@@ -1400,7 +1403,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         systemStatus: function (callback) {
-            publicRequest(wapi + 'v3/systemStatus.html', {}, callback);
+            publicRequest(getWapiUrl() + 'v3/systemStatus.html', {}, callback);
         },
 
         /**
@@ -1417,7 +1420,7 @@ let api = function Binance() {
             let params = { asset, address, amount };
             if (addressTag) params.addressTag = addressTag;
             if (name) params.name = name
-            signedRequest(wapi + 'v3/withdraw.html', params, callback, 'POST', true);
+            signedRequest(getWapiUrl() + 'v3/withdraw.html', params, callback, 'POST', true);
         },
 
         /**
@@ -1428,7 +1431,7 @@ let api = function Binance() {
         */
         withdrawHistory: function (callback, params = {}) {
             if (typeof params === 'string') params = { asset: params };
-            signedRequest(wapi + 'v3/withdrawHistory.html', params, callback);
+            signedRequest(getWapiUrl() + 'v3/withdrawHistory.html', params, callback);
         },
 
         /**
@@ -1439,7 +1442,7 @@ let api = function Binance() {
         */
         depositHistory: function (callback, params = {}) {
             if (typeof params === 'string') params = { asset: params }; // Support 'asset' (string) or optional parameters (object)
-            signedRequest(wapi + 'v3/depositHistory.html', params, callback);
+            signedRequest(getWapiUrl() + 'v3/depositHistory.html', params, callback);
         },
 
         /**
@@ -1449,7 +1452,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         depositAddress: function (asset, callback) {
-            signedRequest(wapi + 'v3/depositAddress.html', { asset: asset }, callback);
+            signedRequest(getWapiUrl() + 'v3/depositAddress.html', { asset: asset }, callback);
         },
 
         /**
@@ -1458,7 +1461,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         accountStatus: function (callback) {
-            signedRequest(wapi + 'v3/accountStatus.html', {}, callback);
+            signedRequest(getWapiUrl() + 'v3/accountStatus.html', {}, callback);
         },
 
         /**
@@ -1469,7 +1472,7 @@ let api = function Binance() {
         */
         tradeFee: function (callback, symbol = false) {
             let params = symbol ? { symbol: symbol } : {};
-            signedRequest(wapi + 'v3/tradeFee.html', params, callback);
+            signedRequest(getWapiUrl() + 'v3/tradeFee.html', params, callback);
         },
 
         /**
@@ -1478,7 +1481,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         assetDetail: function (callback) {
-            signedRequest(wapi + 'v3/assetDetail.html', {}, callback);
+            signedRequest(getWapiUrl() + 'v3/assetDetail.html', {}, callback);
         },
 
         /**
@@ -1487,7 +1490,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         account: function (callback) {
-            signedRequest(base + 'v3/account', {}, callback);
+            signedRequest(getBaseUrl() + 'v3/account', {}, callback);
         },
 
         /**
@@ -1496,7 +1499,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         balance: function (callback) {
-            signedRequest(base + 'v3/account', {}, function (error, data) {
+            signedRequest(getBaseUrl() + 'v3/account', {}, function (error, data) {
                 if (callback) callback(error, balanceData(data));
             });
         },
@@ -1510,7 +1513,7 @@ let api = function Binance() {
         */
         trades: function (symbol, callback, options = {}) {
             let parameters = Object.assign({ symbol: symbol }, options);
-            signedRequest(base + 'v3/myTrades', parameters, function (error, data) {
+            signedRequest(getBaseUrl() + 'v3/myTrades', parameters, function (error, data) {
                 if (callback) return callback.call(this, error, data, symbol);
             });
         },
@@ -1521,7 +1524,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         useServerTime: function (callback = false) {
-            apiRequest(base + 'v1/time', {}, function (error, response) {
+            apiRequest(getBaseUrl() + 'v1/time', {}, function (error, response) {
                 Binance.info.timeOffset = response.serverTime - new Date().getTime();
                 //Binance.options.log("server time set: ", response.serverTime, Binance.info.timeOffset);
                 if (callback) callback();
@@ -1534,7 +1537,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         time: function (callback) {
-            apiRequest(base + 'v1/time', {}, callback);
+            apiRequest(getBaseUrl() + 'v1/time', {}, callback);
         },
 
         /**
@@ -1546,7 +1549,7 @@ let api = function Binance() {
         */
         aggTrades: function (symbol, options = {}, callback = false) { //fromId startTime endTime limit
             let parameters = Object.assign({ symbol }, options);
-            marketRequest(base + 'v1/aggTrades', parameters, callback);
+            marketRequest(getBaseUrl() + 'v1/aggTrades', parameters, callback);
         },
 
         /**
@@ -1557,7 +1560,7 @@ let api = function Binance() {
         * @return {undefined}
         */
         recentTrades: function (symbol, callback, limit = 500) {
-            marketRequest(base + 'v1/trades', { symbol: symbol, limit: limit }, callback);
+            marketRequest(getBaseUrl() + 'v1/trades', { symbol: symbol, limit: limit }, callback);
         },
 
         /**
@@ -1571,7 +1574,7 @@ let api = function Binance() {
         historicalTrades: function (symbol, callback, limit = 500, fromId = false) {
             let parameters = { symbol: symbol, limit: limit };
             if (fromId) parameters.fromId = fromId;
-            marketRequest(base + 'v1/historicalTrades', parameters, callback);
+            marketRequest(getBaseUrl() + 'v1/historicalTrades', parameters, callback);
         },
 
         /**
@@ -1627,7 +1630,7 @@ let api = function Binance() {
         candlesticks: function (symbol, interval = '5m', callback = false, options = { limit: 500 }) {
             if (!callback) return;
             let params = Object.assign({ symbol: symbol, interval: interval }, options);
-            publicRequest(base + 'v1/klines', params, function (error, data) {
+            publicRequest(getBaseUrl() + 'v1/klines', params, function (error, data) {
                 return callback.call(this, error, data, symbol);
             });
         },
@@ -1681,7 +1684,7 @@ let api = function Binance() {
         */
         mgTransferMainToMargin: function (asset, amount, callback) {
             let parameters = Object.assign({ asset: asset, amount: amount, type: 1 });
-            signedRequest(sapi + 'v1/margin/transfer', parameters, function (error, data) {
+            signedRequest(getSapi() + 'v1/margin/transfer', parameters, function (error, data) {
                 if (callback) return callback(error, data);
             }, 'POST');
         },
@@ -1695,7 +1698,7 @@ let api = function Binance() {
         */
         mgTransferMarginToMain: function (asset, amount, callback) {
             let parameters = Object.assign({ asset: asset, amount: amount, type: 2 });
-            signedRequest(sapi + 'v1/margin/transfer', parameters, function (error, data) {
+            signedRequest(getSapi() + 'v1/margin/transfer', parameters, function (error, data) {
                 if (callback) return callback(error, data);
             }, 'POST');
         },
@@ -1709,7 +1712,7 @@ let api = function Binance() {
         */
         mgBorrow: function (asset, amount, callback) {
             let parameters = Object.assign({ asset: asset, amount: amount });
-            signedRequest(sapi + 'v1/margin/loan', parameters, function (error, data) {
+            signedRequest(getSapi() + 'v1/margin/loan', parameters, function (error, data) {
                 if (callback) return callback(error, data);
             }, 'POST');
         },
@@ -1723,7 +1726,7 @@ let api = function Binance() {
         */
         mgRepay: function (asset, amount, callback) {
             let parameters = Object.assign({ asset: asset, amount: amount });
-            signedRequest(sapi + 'v1/margin/repay', parameters, function (error, data) {
+            signedRequest(getSapi() + 'v1/margin/repay', parameters, function (error, data) {
                 if (callback) return callback(error, data);
             }, 'POST');
         },
@@ -1742,11 +1745,11 @@ let api = function Binance() {
                 let reconnect = function () {
                     if (Binance.options.reconnect) userData(callback, execution_callback, subscribed_callback);
                 };
-                apiRequest(base + 'v1/userDataStream', {}, function (error, response) {
+                apiRequest(getBaseUrl() + 'v1/userDataStream', {}, function (error, response) {
                     Binance.options.listenKey = response.listenKey;
                     setTimeout(function userDataKeepAlive() { // keepalive
                         try {
-                            apiRequest(base + 'v1/userDataStream?listenKey=' + Binance.options.listenKey, {}, function (err) {
+                            apiRequest(getBaseUrl() + 'v1/userDataStream?listenKey=' + Binance.options.listenKey, {}, function (err) {
                                 if (err) setTimeout(userDataKeepAlive, 60000); // retry in 1 minute
                                 else setTimeout(userDataKeepAlive, 60 * 30 * 1000); // 30 minute keepalive
                             }, 'PUT');
@@ -1774,11 +1777,11 @@ let api = function Binance() {
                 let reconnect = function () {
                     if (Binance.options.reconnect) userMarginData(callback, execution_callback, subscribed_callback);
                 };
-                apiRequest(sapi + 'v1/userDataStream', {}, function (error, response) {
+                apiRequest(getSapi() + 'v1/userDataStream', {}, function (error, response) {
                     Binance.options.listenMarginKey = response.listenKey;
                     setTimeout(function userDataKeepAlive() { // keepalive
                         try {
-                            apiRequest(sapi + 'v1/userDataStream?listenKey=' + Binance.options.listenMarginKey, {}, function (err) {
+                            apiRequest(getSapi() + 'v1/userDataStream?listenKey=' + Binance.options.listenMarginKey, {}, function (err) {
                                 if (err) setTimeout(userDataKeepAlive, 60000); // retry in 1 minute
                                 else setTimeout(userDataKeepAlive, 60 * 30 * 1000); // 30 minute keepalive
                             }, 'PUT');
@@ -1906,7 +1909,7 @@ let api = function Binance() {
 
                 let getSymbolDepthSnapshot = function (symbol, cb) {
 
-                    publicRequest(base + 'v1/depth', { symbol: symbol, limit: limit }, function (error, json) {
+                    publicRequest(getBaseUrl() + 'v1/depth', { symbol: symbol, limit: limit }, function (error, json) {
                         if (error) {
                             return cb(error, null);
                         }
@@ -2096,7 +2099,7 @@ let api = function Binance() {
                 };
 
                 let getSymbolKlineSnapshot = function (symbol, limit = 500) {
-                    publicRequest(base + 'v1/klines', { symbol: symbol, interval: interval, limit: limit }, function (error, data) {
+                    publicRequest(getBaseUrl() + 'v1/klines', { symbol: symbol, interval: interval, limit: limit }, function (error, data) {
                         klineData(symbol, interval, data);
                         //Binance.options.log('/klines at ' + Binance.info[symbol][interval].timestamp);
                         if (typeof Binance.klineQueue[symbol][interval] !== 'undefined') {
