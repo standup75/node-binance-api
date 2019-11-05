@@ -40,7 +40,7 @@ let api = function Binance() {
         reconnect: true,
         verbose: false,
         test: false,
-				baseUrl: 'https://api.binance.com',
+        baseUrl: 'https://api.binance.com',
         log: function (...args) {
             console.log(Array.prototype.slice.call(args));
         }
@@ -48,10 +48,10 @@ let api = function Binance() {
     Binance.options = default_options;
     Binance.info = { timeOffset: 0 };
     Binance.socketHeartbeatInterval = null;
-		
-		const getBaseUrl = () => `${Binance.options.baseUrl}/api/`;
-		const getWapiUrl = () => `${Binance.options.baseUrl}/wapi/`;
-		const getSapi = () => `${Binance.options.baseUrl}/sapi`;
+    
+    const getBaseUrl = () => `${Binance.options.baseUrl}/api/`;
+    const getWapiUrl = () => `${Binance.options.baseUrl}/wapi/`;
+    const getSapi = () => `${Binance.options.baseUrl}/sapi`;
 
     /**
      * Replaces socks connection uri hostname with IP address
